@@ -1,4 +1,4 @@
-# Chapter 5 from MLwithR-Lantz
+
 
 #data represents loan from credit agency
 
