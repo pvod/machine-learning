@@ -1,0 +1,42 @@
+# K-NN model on classifying cancer on "Breast Cancer Wisconsin Diagnostic" data
+# from "http://archive.ics.uci.edu/ml
+# http://archive.ics.uci.edu/ml/datasets/Breast+Cancer+Wisconsin+%28Diagnostic%29"
+
+bcdata_raw <- read.csv("wisc_bc_data.csv", stringsAsFactors = FALSE)
+str(bcdata_raw)
+#dropping 1st column as it is an ID for each patient. 
+bcdata <- bcdata_raw[,-which(names(bcdata_raw) == "id")] 
+#looking at distribution of diagnosis column
+table(bcdata$diagnosis)
+#converting diagnosis as factor and adding labels to levels
+bcdata$diagnosis <- factor(bcdata$diagnosis, levels = c("B","M"), labels = c("Benign","Malignant"))
+round(prop.table(table(bcdata$diagnosis))*100, digit=2)
+summary(bcdata)
+#the data doesnt fall under same scale so there is a need to normalize the data inorder to use knn algorithm
+normalize<-function(x){
+  return((x-min(x))/(max(x)-min(x)))
+}
+bcdata_norm<-as.data.frame(lapply(bcdata[which(!names(bcdata) == "diagnosis")],normalize))
+summary(bcdata_norm$area_mean)
+#splitting data into train and test
+bcdata_train<-bcdata_norm[1:round(.80*nrow(bcdata_norm)),]
+bcdata_test<-bcdata_norm[(round(.80*nrow(bcdata_norm))+1):nrow(bcdata_norm),]
+bcdata_train_labels<-bcdata[1:round(.80*nrow(bcdata_norm)),1]
+bcdata_test_labels<-bcdata[(round(.80*nrow(bcdata_norm))+1):nrow(bcdata_norm),1]
+#training a model
+install.packages("class")
+library(class)
+bcdata_pred<-knn(train=bcdata_train,test=bcdata_test,cl=bcdata_train_labels,k=21)
+#evaluating model performance
+install.packages("gmodels")
+library(gmodels)
+CrossTable(x=bcdata_test_labels,y=bcdata_pred, prop.chisq = FALSE)
+#improving model performance by z-score standardization
+bcdata_zscore<-as.data.frame(scale(bcdata[which(!names(bcdata) == "diagnosis")]))
+summary(bcdata_zscore$area_mean)
+bcdata_train2<-bcdata_zscore[1:round(.80*nrow(bcdata_norm)),]
+bcdata_test2<-bcdata_zscore[(round(.80*nrow(bcdata_norm))+1):nrow(bcdata_norm),]
+bcdata_train_labels2<-bcdata[1:round(.80*nrow(bcdata_norm)),1]
+bcdata_test_labels2<-bcdata[(round(.80*nrow(bcdata_norm))+1):nrow(bcdata_norm),1]
+bcdata_pred2<-knn(train=bcdata_train2,test=bcdata_test2,cl=bcdata_train_labels2,k=21)
+CrossTable(x=bcdata_test_labels2,y=bcdata_pred2, prop.chisq = FALSE)
