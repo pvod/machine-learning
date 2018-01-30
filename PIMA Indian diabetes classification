@@ -1,0 +1,54 @@
+%matplotlib inline
+import sys
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+import seaborn as sns
+import math
+import os
+data_path = '\Desktop\'
+df = pd.read_csv('pima-data.csv')
+df.shape
+df.head()
+df.diabetes.value_counts()
+df.diabetes=pd.get_dummies(df['diabetes'],drop_first=True)
+df.diabetes.value_counts()
+df.isnull().values.any()
+# Diabetic glucose concentration histogram
+df.glucose_conc.hist()
+plt.title(' glucose')
+plt.xlabel('Glucose Level')
+plt.ylabel('Count')
+plt.hist(df.bmi)
+plt.xlabel('bmi')
+plt.ylabel('count')
+plt.title(' bmi')
+plt.hist(df.age)
+plt.xlabel('age')
+plt.ylabel('count')
+plt.title('age')
+from patsy import dmatrices
+y, x = dmatrices('diabetes ~ num_preg +glucose_conc + diastolic_bp + thickness + \
+                  insulin + bmi + diab_pred + age + skin',
+                  df, return_type="dataframe")
+#Splitting data for train and test
+from sklearn.model_selection import train_test_split
+x_train, x_test, y_train, y_test = train_test_split(x, y, test_size=0.3, random_state=0)
+y_train
+# flatten y into a 1-D array
+y_train = np.ravel(y_train)
+#Logistic Regression
+from sklearn.linear_model import LogisticRegression
+lr = LogisticRegression(random_state=42)
+model=lr.fit(x_train,y_train)
+model.score(x_train,y_train)
+y_pred=lr.predict(x_test)
+from sklearn import metrics
+from sklearn.metrics import confusion_matrix
+cm=confusion_matrix(y_test,y_pred)
+cm
+print("Confusion Matrix")
+print("{0}".format(metrics.confusion_matrix(y_test, y_pred, labels=[1,0])))
+print("")
+print("classification report")
+print(metrics.classification_report(y_test, y_pred, labels=[1,0]))
