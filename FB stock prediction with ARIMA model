@@ -1,0 +1,25 @@
+#prediction of stock 
+install.packages("quantmod")
+library(quantmod)
+getSymbols("FB",src="yahoo",from="2015-01-01")
+plot(FB) #the data has no trend and pretty much straight.
+#If the data has a trend, then you need to take diff(log(FB))..this adjust the variance and removes trends
+#this is called as stationary data
+
+#dickey-fuller test with a p-value under 0.05 tells the data is stationary
+#with p-value less than 0.05 we reject the null hypothesis of non-stationary
+#adf.test(FB$FB.Close,alternative = "stationary")
+#diff(FB$FB.Close)
+#adf.test(diff((FB$FB.Close)),alternative = "stationary")
+install.packages("forecast")
+library(forecast)
+fit <- auto.arima(FB$FB.Close, ic="bic") #chooses automatically ARIMA(p,d,q) values
+fit
+plot(as.ts(FB$FB.Close))
+lines(fitted(fit),col="red")
+install.packages("forecasting") 
+library(forecasting)
+library(tseries)
+fit.forecast <- forecast(fit,h=26) #h is the number of prediction time series
+fit.forecast #gives you 80% accuracy value and 95% accuracy value
+plot(fit.forecast)
