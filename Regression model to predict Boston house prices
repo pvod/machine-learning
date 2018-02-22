@@ -1,0 +1,262 @@
+#Regression model to predict boston house pricing
+# load packages
+install.packages("mlbench")
+library(mlbench)
+library(caret)
+library(corrplot)
+# attach the BostonHousing dataset
+data(BostonHousing)
+names(BostonHousing)
+summary(BostonHousing)
+head(BostonHousing)
+
+
+#creating train and test model 
+set.seed(7)
+validationIndex <- createDataPartition(BostonHousing$medv, p=0.80, list=FALSE)
+# select 20% of the data for validation
+validation <- BostonHousing[-validationIndex,]
+# use the remaining 80% of data to training
+dataset <- BostonHousing[validationIndex,]
+
+
+str(dataset)
+df_status(dataset)
+#we notice missing values for zn and chas variable
+#converting chas to numeric variable
+dataset[,4] <- as.numeric(as.character(dataset[,4]))
+head(dataset)
+
+#looking at correlation
+cor(dataset[,1:13])
+pairs(dataset[,1:13])
+install.packages("psych")
+library(psych)
+pairs.panels(dataset[,1:13])
+
+# boxplots for each attribute
+par(mfrow=c(2,7))
+for(i in 1:13) {
+  boxplot(dataset[,i], main=names(dataset)[i])
+}
+
+corrplot(cor(dataset[,1:13]), method="circle")
+df_status(dataset)
+
+#impute missing values for zn and chas 
+
+head(dataset$zn,20)
+head(dataset$chas,20)
+
+model=lm(dataset$medv ~., data = dataset[,1:13])
+summary(model)
+
+#removing least significant 
+dataset2<-dataset[-3]
+names(dataset2)
+dataset2<-dataset2[-6]
+names(dataset2)
+model2=lm(dataset$medv ~., data = dataset2[,-12])
+summary(model2)
+
+par(mfrow = c(1, 2))
+
+plot(fitted(model2), resid(model2), col = "grey", pch = 20,
+     xlab = "Fitted", ylab = "Residuals", main = "Fitted versus Residuals")
+abline(h = 0, col = "darkorange", lwd = 2)
+
+qqnorm(resid(model2), main = "Normal Q-Q Plot", col = "darkgrey")
+qqline(resid(model2), col = "dodgerblue", lwd = 2)
+
+sqrt(mean(resid(model) ^ 2))
+sqrt(mean(resid(model2) ^ 2))
+
+library(lmtest)
+bptest(model2)
+vif(model2)
+install.packages('faraway')
+library(faraway)
+library(MASS)
+
+#we know that rad and tax are correlated. Lets try to remove one from model
+dataset3=dataset2[-8]
+model3=lm(dataset$medv ~., data = dataset3[,-11])
+summary(model3)
+vif(model3)
+anova(model3)
+
+#trying feature selection using step both direction
+dataset_mod_start = lm(dataset$medv ~ 1, data = dataset[,-14])
+dataset_mod_both_aic = step(
+  dataset_mod_start, 
+  scope = dataset$medv ~ crim + zn + indus + chas + nox  + rm + age + dis + rad + tax + ptratio + b +lstat,
+  direction = "both")
+
+model4=lm(dataset$medv ~ lstat + rm + ptratio + b + dis + nox + chas + 
+            zn + rad + crim, data=dataset)
+summary(model4)
+bptest(model4)
+vif(model4)
+
+
+#trying to normalize 
+normalize <- function(x) {
+  return ((x - min(x)) / (max(x) - min(x)))
+}
+dataset5 <- as.data.frame(lapply(dataset[1:13], normalize))
+
+model5=lm(dataset$medv ~., data = dataset5)
+summary(model5)
+vif(model5)
+bptest(model5)
+
+
+dataset6 <- dataset5[-5]
+dataset6 <- dataset6[-9]
+model6=lm(dataset$medv ~., data = dataset6)
+summary(model6)
+bptest(model6)
+vif(model6)
+
+
+#from book
+# Run algorithms using 10-fold cross-validation
+trainControl <- trainControl(method="repeatedcv", number=10, repeats=3)
+metric <- "RMSE"
+#linear model
+fit.lm <- train(medv~., data=dataset, method="lm", metric=metric, preProc=c("center",
+                                                                            "scale"), trControl=trainControl)
+# GLM:Generalized Linear Regression
+set.seed(7)
+fit.glm <- train(medv~., data=dataset, method="glm", metric=metric, preProc=c("center",
+                                                                              "scale"), trControl=trainControl)
+# GLMNET: Penalized Linear Regression
+set.seed(7)
+fit.glmnet <- train(medv~., data=dataset, method="glmnet", metric=metric,
+                    preProc=c("center", "scale"), trControl=trainControl)
+# SVM
+set.seed(7)
+fit.svm <- train(medv~., data=dataset, method="svmRadial", metric=metric,
+                 preProc=c("center", "scale"), trControl=trainControl)
+# CART
+set.seed(7)
+grid <- expand.grid(.cp=c(0, 0.05, 0.1))
+fit.cart <- train(medv~., data=dataset, method="rpart", metric=metric, tuneGrid=grid,
+                  preProc=c("center", "scale"), trControl=trainControl)
+# KNN
+set.seed(7)
+fit.knn <- train(medv~., data=dataset, method="knn", metric=metric, preProc=c("center",
+                                                                              "scale"), trControl=trainControl)
+
+
+# Compare algorithms
+results <- resamples(list(LM=fit.lm, GLM=fit.glm, GLMNET=fit.glmnet, SVM=fit.svm,
+                          CART=fit.cart, KNN=fit.knn))
+summary(results)
+dotplot(results)
+
+
+#looking at highly correlated attributes
+# remove correlated attributes
+# find attributes that are highly correlated findCorrelation() function from the caret package
+set.seed(7)
+cutoff <- 0.70
+correlations <- cor(dataset[,1:13])
+highlyCorrelated <- findCorrelation(correlations, cutoff=cutoff)
+for (value in highlyCorrelated) {
+  print(names(dataset)[value])
+}
+datasetFeatures <- dataset[,-highlyCorrelated]
+dim(datasetFeatures)
+
+#Now let's try the same 6 algorithms from our baseline experiment.
+# Run algorithms using 10-fold cross-validation
+trainControl <- trainControl(method="repeatedcv", number=10, repeats=3)
+metric <- "RMSE"
+# lm
+set.seed(7)
+fit.lm <- train(medv~., data=datasetFeatures, method="lm", metric=metric,
+preProc=c("center", "scale"), trControl=trainControl)
+# GLM
+set.seed(7)
+fit.glm <- train(medv~., data=datasetFeatures, method="glm", metric=metric,
+preProc=c("center", "scale"), trControl=trainControl)
+# GLMNET
+set.seed(7)
+fit.glmnet <- train(medv~., data=datasetFeatures, method="glmnet", metric=metric,
+preProc=c("center", "scale"), trControl=trainControl)
+# SVM
+set.seed(7)
+fit.svm <- train(medv~., data=datasetFeatures, method="svmRadial", metric=metric,
+preProc=c("center", "scale"), trControl=trainControl)
+# CART
+set.seed(7)
+grid <- expand.grid(.cp=c(0, 0.05, 0.1))
+fit.cart <- train(medv~., data=datasetFeatures, method="rpart", metric=metric,
+tuneGrid=grid, preProc=c("center", "scale"), trControl=trainControl)
+# KNN
+set.seed(7)
+fit.knn <- train(medv~., data=datasetFeatures, method="knn", metric=metric,
+preProc=c("center", "scale"), trControl=trainControl)
+# Compare algorithms
+feature_results <- resamples(list(LM=fit.lm, GLM=fit.glm, GLMNET=fit.glmnet, SVM=fit.svm,
+CART=fit.cart, KNN=fit.knn))
+summary(feature_results)
+dotplot(feature_results)
+
+#using box-cox transform
+# Run algorithms using 10-fold cross-validation
+trainControl <- trainControl(method="repeatedcv", number=10, repeats=3)
+metric <- "RMSE"
+# lm
+set.seed(7)
+fit.lm <- train(medv~., data=dataset, method="lm", metric=metric, preProc=c("center",
+                                                                            "scale", "BoxCox"), trControl=trainControl)
+# GLM
+set.seed(7)
+fit.glm <- train(medv~., data=dataset, method="glm", metric=metric, preProc=c("center",
+                                                                              "scale", "BoxCox"), trControl=trainControl)
+# GLMNET
+set.seed(7)
+fit.glmnet <- train(medv~., data=dataset, method="glmnet", metric=metric,
+                    preProc=c("center", "scale", "BoxCox"), trControl=trainControl)
+# SVM
+set.seed(7)
+fit.svm <- train(medv~., data=dataset, method="svmRadial", metric=metric,
+                 preProc=c("center", "scale", "BoxCox"), trControl=trainControl)
+# CART
+set.seed(7)
+grid <- expand.grid(.cp=c(0, 0.05, 0.1))
+fit.cart <- train(medv~., data=dataset, method="rpart", metric=metric, tuneGrid=grid,
+                  preProc=c("center", "scale", "BoxCox"), trControl=trainControl)
+# KNN
+set.seed(7)
+fit.knn <- train(medv~., data=dataset, method="knn", metric=metric, preProc=c("center",
+                                                                              "scale", "BoxCox"), trControl=trainControl)
+# Compare algorithms
+transformResults <- resamples(list(LM=fit.lm, GLM=fit.glm, GLMNET=fit.glmnet, SVM=fit.svm,
+                                   CART=fit.cart, KNN=fit.knn))
+summary(transformResults)
+dotplot(transformResults)
+
+
+
+# try ensembles
+trainControl <- trainControl(method="repeatedcv", number=10, repeats=3)
+metric <- "RMSE"
+# Random Forest
+set.seed(seed)
+fit.rf <- train(medv~., data=dataset, method="rf", metric=metric, preProc=c("BoxCox"),
+                trControl=trainControl)
+# Stochastic Gradient Boosting
+set.seed(seed)
+fit.gbm <- train(medv~., data=dataset, method="gbm", metric=metric, preProc=c("BoxCox"),
+                 trControl=trainControl, verbose=FALSE)
+# Cubist
+set.seed(seed)
+fit.cubist <- train(medv~., data=dataset, method="cubist", metric=metric,
+                    preProc=c("BoxCox"), trControl=trainControl)
+# Compare algorithms
+ensembleResults <- resamples(list(RF=fit.rf, GBM=fit.gbm, CUBIST=fit.cubist))
+summary(ensembleResults)
+dotplot(ensembleResults)
