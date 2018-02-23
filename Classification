@@ -1,0 +1,3 @@
+Classification models are used when we want to predict a categorical variable. Categorical variable can be of two kinds:
+  Nominal: Categorical values without no intrinsic ordering. Example: Male/Female, True/False etc
+  Ordinal: Categorical values with an order. Example: Small/Medium/Large, Elementary/Middle/High School etc
