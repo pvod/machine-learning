@@ -1,3 +1,9 @@
 Classification models are used when we want to predict a categorical variable. Categorical variable can be of two kinds:
   Nominal: Categorical values without no intrinsic ordering. Example: Male/Female, True/False etc
   Ordinal: Categorical values with an order. Example: Small/Medium/Large, Elementary/Middle/High School etc
+  
+We will be looking at the following Classification models
+1. K-Nearest Neighbour
+2. Naive Bayes
+3. Decison Tree
+4. Logistic Regression
