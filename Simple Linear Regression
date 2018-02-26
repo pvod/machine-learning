@@ -1,0 +1,2 @@
+In Simple linear regression, we are dealing with one predictor variable. Consider a variable y that is dependent on x, then the relationship is given by:
+y=*b0*+*b1*x
